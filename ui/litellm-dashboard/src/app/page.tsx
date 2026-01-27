@@ -22,7 +22,7 @@ import Navbar from "@/components/navbar";
 import { getUiConfig, Organization, proxyBaseUrl, setGlobalLitellmHeaderName, getInProductNudgesCall } from "@/components/networking";
 import NewUsagePage from "@/components/UsagePage/components/UsagePageView";
 import OldTeams from "@/components/OldTeams";
-import { fetchUserModels } from "@/components/organisms/create_key_button";
+import { fetchUserModels, CreateKeyPrefillData } from "@/components/organisms/create_key_button";
 import Organizations, { fetchOrganizations } from "@/components/organizations";
 import PassThroughSettings from "@/components/pass_through_settings";
 import PromptsPanel from "@/components/prompts";
@@ -40,11 +40,12 @@ import SpendLogsTable from "@/components/view_logs";
 import ViewUserDashboard from "@/components/view_users";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { isJwtExpired } from "@/utils/jwtUtils";
+import { buildLoginUrlWithReturn, consumeReturnUrl, storeReturnUrl } from "@/utils/returnUrlUtils";
 import { isAdminRole } from "@/utils/roles";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { jwtDecode } from "jwt-decode";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 
 function getCookie(name: string) {
   // Safer cookie read + decoding; handles '=' inside values
@@ -133,6 +134,31 @@ export default function CreateKeyPage() {
 
   const invitation_id = searchParams.get("invitation_id");
 
+  // Parse URL query parameters for pre-filling the create key form
+  const autoOpenCreate = searchParams.get("create") === "true";
+  const prefillData: CreateKeyPrefillData | undefined = useMemo(() => {
+    if (!autoOpenCreate) return undefined;
+
+    const ownedBy = searchParams.get("owned_by");
+    const teamId = searchParams.get("team_id");
+    const keyAlias = searchParams.get("key_alias");
+    const modelsParam = searchParams.get("models");
+    const keyType = searchParams.get("key_type");
+
+    // Only return prefill data if at least one field is provided
+    if (!ownedBy && !teamId && !keyAlias && !modelsParam && !keyType) {
+      return undefined;
+    }
+
+    return {
+      owned_by: ownedBy as CreateKeyPrefillData["owned_by"],
+      team_id: teamId || undefined,
+      key_alias: keyAlias || undefined,
+      models: modelsParam ? modelsParam.split(",").map(m => m.trim()) : undefined,
+      key_type: keyType as CreateKeyPrefillData["key_type"],
+    };
+  }, [searchParams, autoOpenCreate]);
+
   // Get page from URL, default to 'api-keys' if not present
   const [page, setPage] = useState(() => {
     return searchParams.get("page") || "api-keys";
@@ -197,11 +223,34 @@ export default function CreateKeyPage() {
 
   useEffect(() => {
     if (redirectToLogin) {
+      // Store the current URL so we can redirect back after login
+      storeReturnUrl();
+      // Build login URL with return URL parameter
+      const baseLoginUrl = (proxyBaseUrl || "") + "/ui/login";
+      const dest = buildLoginUrlWithReturn(baseLoginUrl);
       // Replace instead of assigning to avoid back-button loops
-      const dest = (proxyBaseUrl || "") + "/ui/login";
       window.location.replace(dest);
     }
   }, [redirectToLogin]);
+
+  // Check for a stored return URL after successful authentication
+  // This handles the case where user comes back from SSO and we need to redirect to the original URL
+  useEffect(() => {
+    if (authLoading || !token) {
+      return;
+    }
+
+    // Check for a stored return URL
+    const returnUrl = consumeReturnUrl();
+    if (returnUrl) {
+      const currentUrl = window.location.href;
+      // Only redirect if the return URL is different from the current URL
+      // This prevents infinite redirect loops
+      if (returnUrl !== currentUrl) {
+        window.location.replace(returnUrl);
+      }
+    }
+  }, [authLoading, token]);
 
   useEffect(() => {
     if (!token) {
@@ -413,6 +462,8 @@ export default function CreateKeyPage() {
                     organizations={organizations}
                     addKey={addKey}
                     createClicked={createClicked}
+                    autoOpenCreate={autoOpenCreate}
+                    prefillData={prefillData}
                   />
                 ) : page == "models" ? (
                   <OldModelDashboard
