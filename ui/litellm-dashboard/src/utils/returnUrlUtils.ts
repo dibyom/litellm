@@ -166,8 +166,22 @@ export function getReturnUrl(): string | null {
 }
 
 /**
+ * Checks if we're running in a development environment.
+ * Returns true for localhost, 127.0.0.1, or IPv6 localhost.
+ */
+function isDevEnvironment(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const hostname = window.location.hostname;
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
+/**
  * Validates a return URL to prevent open redirect attacks.
- * Only allows relative URLs or URLs with the same hostname.
+ * - Always allows relative URLs (starting with / but not //)
+ * - In dev (localhost): allows same hostname with any port
+ * - In production: requires exact origin match (protocol + hostname + port)
  *
  * @param url - The URL to validate
  * @returns true if the URL is safe to redirect to
@@ -182,7 +196,7 @@ export function isValidReturnUrl(url: string): boolean {
     return true;
   }
 
-  // For absolute URLs, check they're on the same hostname (allow different ports)
+  // For absolute URLs, validate against current origin
   if (typeof window === "undefined") {
     return false;
   }
@@ -190,8 +204,20 @@ export function isValidReturnUrl(url: string): boolean {
   try {
     const returnUrlObj = new URL(url);
     const currentHostname = window.location.hostname;
-    // Allow same hostname even with different ports (for dev environments)
-    return returnUrlObj.hostname === currentHostname;
+
+    // Hostname must always match
+    if (returnUrlObj.hostname !== currentHostname) {
+      return false;
+    }
+
+    // In dev environments (localhost), allow any port on the same hostname
+    // This supports SSO flows that cross ports (e.g., localhost:3000 -> localhost:4000)
+    if (isDevEnvironment()) {
+      return true;
+    }
+
+    // In production, require exact origin match (protocol + hostname + port)
+    return returnUrlObj.origin === window.location.origin;
   } catch {
     // Invalid URL
     return false;
