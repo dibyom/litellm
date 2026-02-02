@@ -276,24 +276,33 @@ const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey, autoOp
   }, [accessToken]);
 
   // Auto-open modal and prefill form when autoOpenCreate is true
+  // Only allow auto-open for users with write access (same check as the button)
   useEffect(() => {
-    if (autoOpenCreate && !hasPrefilled && teams) {
+    if (autoOpenCreate && !hasPrefilled && teams && userRole && rolesWithWriteAccess.includes(userRole)) {
       // Open the modal
       setIsModalVisible(true);
       setHasPrefilled(true);
 
       // Apply prefill data if provided
       if (prefillData) {
-        // Set key owner (owned_by)
+        // Set key owner (owned_by) - validate that "another_user" is only allowed for Admin
         if (prefillData.owned_by) {
-          setKeyOwner(prefillData.owned_by);
+          if (prefillData.owned_by === "another_user" && userRole !== "Admin") {
+            // Ignore invalid owned_by for non-admin users, fall back to default
+            setKeyOwner("you");
+          } else {
+            setKeyOwner(prefillData.owned_by);
+          }
         }
 
-        // Set team - find the team by ID and set it
+        // Set team - find the team by ID and set it (only if team exists in user's teams)
         if (prefillData.team_id) {
           const selectedTeam = teams?.find((t) => t.team_id === prefillData.team_id) || null;
-          setSelectedCreateKeyTeam(selectedTeam);
-          form.setFieldsValue({ team_id: prefillData.team_id });
+          if (selectedTeam) {
+            setSelectedCreateKeyTeam(selectedTeam);
+            form.setFieldsValue({ team_id: prefillData.team_id });
+          }
+          // Silently ignore invalid team_id - don't prefill with a team user doesn't have access to
         }
 
         // Set key alias
@@ -313,7 +322,7 @@ const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey, autoOp
         }
       }
     }
-  }, [autoOpenCreate, prefillData, teams, hasPrefilled, form]);
+  }, [autoOpenCreate, prefillData, teams, hasPrefilled, form, userRole]);
 
   // Check if team selection is required
   const isTeamSelectionRequired = modelsToPick.includes("no-default-models");
