@@ -201,14 +201,27 @@ export function isValidReturnUrl(url: string): boolean {
 /**
  * Gets and clears the return URL in one operation.
  * Returns the validated return URL or null if invalid/not found.
+ *
+ * Priority:
+ * 1. If redirect_to param is valid, use it and clear cookie
+ * 2. If redirect_to param is invalid/missing, check cookie
+ * 3. Only clear cookie when we have a valid URL to return
  */
 export function consumeReturnUrl(): string | null {
-  const returnUrl = getReturnUrl();
-  clearStoredReturnUrl();
-
-  if (returnUrl && isValidReturnUrl(returnUrl)) {
-    return returnUrl;
+  // Check URL param first
+  const paramUrl = getReturnUrlFromParams();
+  if (paramUrl && isValidReturnUrl(paramUrl)) {
+    clearStoredReturnUrl();
+    return paramUrl;
   }
 
+  // Fall back to cookie
+  const storedUrl = getStoredReturnUrl();
+  if (storedUrl && isValidReturnUrl(storedUrl)) {
+    clearStoredReturnUrl();
+    return storedUrl;
+  }
+
+  // No valid URL found - don't clear cookie (nothing to clear or already invalid)
   return null;
 }
