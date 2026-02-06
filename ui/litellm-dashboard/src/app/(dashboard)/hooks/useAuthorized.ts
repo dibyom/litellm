@@ -7,36 +7,8 @@ import { buildLoginUrlWithReturn, storeReturnUrl } from "@/utils/returnUrlUtils"
 import { jwtDecode } from "jwt-decode";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo } from "react";
+import { formatUserRole } from "@/utils/roles";
 import { useUIConfig } from "./uiConfig/useUIConfig";
-
-function formatUserRole(userRole: string) {
-  if (!userRole) {
-    return "Undefined Role";
-  }
-  switch (userRole.toLowerCase()) {
-    case "app_owner":
-      return "App Owner";
-    case "demo_app_owner":
-      return "App Owner";
-    case "app_admin":
-      return "Admin";
-    case "proxy_admin":
-      return "Admin";
-    case "proxy_admin_viewer":
-      return "Admin Viewer";
-    case "org_admin":
-      return "Org Admin";
-    case "internal_user":
-      return "Internal User";
-    case "internal_user_viewer":
-    case "internal_viewer": // TODO:remove if deprecated
-      return "Internal Viewer";
-    case "app_user":
-      return "App User";
-    default:
-      return "Unknown Role";
-  }
-}
 
 const useAuthorized = () => {
   const router = useRouter();

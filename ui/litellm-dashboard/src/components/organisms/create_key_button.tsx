@@ -516,22 +516,13 @@ const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey, autoOp
       fetchTeamModels(userID, userRole, accessToken, selectedCreateKeyTeam?.team_id ?? null).then((models) => {
         let allModels = Array.from(new Set([...(selectedCreateKeyTeam?.models ?? []), ...models]));
         setModelsToPick(allModels);
-
-        // If we have pending prefill models, apply them now that modelsToPick is populated
-        if (pendingPrefillModels && pendingPrefillModels.length > 0) {
-          const validModels = pendingPrefillModels.filter(m => allModels.includes(m));
-          if (validModels.length > 0) {
-            form.setFieldsValue({ models: validModels });
-          }
-          setPendingPrefillModels(null);
-        }
       });
     }
     // Only clear models if we don't have pending prefill models
     if (!pendingPrefillModels) {
       form.setFieldValue("models", []);
     }
-  }, [selectedCreateKeyTeam, accessToken, userID, userRole]);
+  }, [selectedCreateKeyTeam, accessToken, userID, userRole, form]);
 
   // Apply deferred model prefill once the available model list arrives.
   // This handles the case where models were provided but no team_id was.

@@ -2,25 +2,31 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders, screen, waitFor } from "../../../tests/test-utils";
 import CreateKey from "./create_key_button";
 
-const { formMock, setFieldsValueMock } = vi.hoisted(() => {
+const { formMock, setFieldsValueMock, radioGroupValueRef } = vi.hoisted(() => {
   const formMock = {
     setFieldsValue: vi.fn(),
     setFieldValue: vi.fn(),
     resetFields: vi.fn(),
   };
+  const radioGroupValueRef = { current: null as string | null };
   return {
     formMock,
     setFieldsValueMock: formMock.setFieldsValue,
+    radioGroupValueRef,
   };
 });
 
+const defaultAuthorizedState = {
+  accessToken: "test-token",
+  userId: "test-user-id",
+  userRole: "Admin",
+  premiumUser: false,
+};
+
+let authorizedState = { ...defaultAuthorizedState };
+
 vi.mock("@/app/(dashboard)/hooks/useAuthorized", () => ({
-  default: () => ({
-    accessToken: "test-token",
-    userId: "test-user-id",
-    userRole: "Admin",
-    premiumUser: false,
-  }),
+  default: () => authorizedState,
 }));
 
 vi.mock("@/app/(dashboard)/hooks/keys/useKeys", () => ({
@@ -77,7 +83,10 @@ vi.mock("antd", () => {
     open ? React.createElement("div", null, children) : null;
 
   const Radio = {
-    Group: ({ children }: { children?: any }) => React.createElement("div", null, children),
+    Group: ({ children, value }: { children?: any; value?: string }) => {
+      radioGroupValueRef.current = value ?? null;
+      return React.createElement("div", null, children);
+    },
   };
 
   const Switch = (props: any) => React.createElement("input", { ...props, type: "checkbox" });
@@ -154,6 +163,8 @@ describe("CreateKey", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    authorizedState = { ...defaultAuthorizedState };
+    radioGroupValueRef.current = null;
   });
 
   it("should render the CreateKey component", () => {
@@ -174,6 +185,84 @@ describe("CreateKey", () => {
 
     await waitFor(() => {
       expect(setFieldsValueMock).toHaveBeenCalledWith({ models: ["gpt-4"] });
+    });
+  });
+
+  it("should prefill team_id when it exists in teams", async () => {
+    renderWithProviders(
+      <CreateKey
+        {...defaultProps}
+        teams={[{ team_id: "team-1", models: [] } as any]}
+        autoOpenCreate={true}
+        prefillData={{ team_id: "team-1" }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(setFieldsValueMock).toHaveBeenCalledWith({ team_id: "team-1" });
+    });
+  });
+
+  it("should ignore team_id when it does not exist in teams", async () => {
+    renderWithProviders(
+      <CreateKey
+        {...defaultProps}
+        teams={[{ team_id: "team-1", models: [] } as any]}
+        autoOpenCreate={true}
+        prefillData={{ team_id: "team-404", key_alias: "example-key" }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(setFieldsValueMock).toHaveBeenCalledWith({ key_alias: "example-key" });
+    });
+
+    expect(setFieldsValueMock).not.toHaveBeenCalledWith({ team_id: "team-404" });
+  });
+
+  it("should fall back to \"you\" when owned_by is another_user for non-admin", async () => {
+    authorizedState = { ...defaultAuthorizedState, userRole: "Internal User" };
+
+    renderWithProviders(
+      <CreateKey
+        {...defaultProps}
+        autoOpenCreate={true}
+        prefillData={{ owned_by: "another_user", key_alias: "example-key" }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(setFieldsValueMock).toHaveBeenCalledWith({ key_alias: "example-key" });
+    });
+
+    expect(radioGroupValueRef.current).toBe("you");
+  });
+
+  it("should apply owned_by another_user for admin", async () => {
+    renderWithProviders(
+      <CreateKey
+        {...defaultProps}
+        autoOpenCreate={true}
+        prefillData={{ owned_by: "another_user" }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(radioGroupValueRef.current).toBe("another_user");
+    });
+  });
+
+  it("should prefill key_type when provided", async () => {
+    renderWithProviders(
+      <CreateKey
+        {...defaultProps}
+        autoOpenCreate={true}
+        prefillData={{ key_type: "management" }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(setFieldsValueMock).toHaveBeenCalledWith({ key_type: "management" });
     });
   });
 });

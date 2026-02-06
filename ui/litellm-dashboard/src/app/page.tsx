@@ -40,8 +40,8 @@ import SpendLogsTable from "@/components/view_logs";
 import ViewUserDashboard from "@/components/view_users";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { isJwtExpired } from "@/utils/jwtUtils";
-import { buildLoginUrlWithReturn, consumeReturnUrl, storeReturnUrl } from "@/utils/returnUrlUtils";
-import { isAdminRole } from "@/utils/roles";
+import { buildLoginUrlWithReturn, consumeReturnUrl, normalizeUrlForCompare, storeReturnUrl } from "@/utils/returnUrlUtils";
+import { formatUserRole, isAdminRole } from "@/utils/roles";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { jwtDecode } from "jwt-decode";
 import { useSearchParams } from "next/navigation";
@@ -63,63 +63,6 @@ function getCookie(name: string) {
 function deleteCookie(name: string, path = "/") {
   // Best-effort client-side clear (works for non-HttpOnly cookies without Domain)
   document.cookie = `${name}=; Max-Age=0; Path=${path}`;
-}
-
-function normalizeUrlForCompare(url: string): string {
-  if (typeof window === "undefined") {
-    return url;
-  }
-
-  try {
-    const parsed = new URL(url, window.location.origin);
-    let pathname = parsed.pathname;
-    if (pathname.length > 1 && pathname.endsWith("/")) {
-      pathname = pathname.slice(0, -1);
-    }
-
-    const params = new URLSearchParams(parsed.search);
-    const sortedParams = new URLSearchParams();
-    Array.from(params.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .forEach(([key, value]) => {
-        sortedParams.append(key, value);
-      });
-
-    const search = sortedParams.toString();
-    const hash = parsed.hash || "";
-    return `${parsed.origin}${pathname}${search ? `?${search}` : ""}${hash}`;
-  } catch {
-    return url;
-  }
-}
-
-function formatUserRole(userRole: string) {
-  if (!userRole) {
-    return "Undefined Role";
-  }
-  switch (userRole.toLowerCase()) {
-    case "app_owner":
-      return "App Owner";
-    case "demo_app_owner":
-      return "App Owner";
-    case "app_admin":
-      return "Admin";
-    case "proxy_admin":
-      return "Admin";
-    case "proxy_admin_viewer":
-      return "Admin Viewer";
-    case "org_admin":
-      return "Org Admin";
-    case "internal_user":
-      return "Internal User";
-    case "internal_user_viewer":
-    case "internal_viewer": // TODO:remove if deprecated
-      return "Internal Viewer";
-    case "app_user":
-      return "App User";
-    default:
-      return "Unknown Role";
-  }
 }
 
 interface ProxySettings {
