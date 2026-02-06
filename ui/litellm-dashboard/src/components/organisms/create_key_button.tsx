@@ -275,8 +275,8 @@ const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey, autoOp
     fetchPossibleRoles();
   }, [accessToken]);
 
-  // Auto-open modal and prefill form when autoOpenCreate is true
-  // Only allow auto-open for users with write access (same check as the button)
+  // Auto-open modal and prefill form from URL params (deep link).
+  // Guarded by write access so we don't open for read-only users.
   useEffect(() => {
     if (autoOpenCreate && !hasPrefilled && teams && userRole && rolesWithWriteAccess.includes(userRole)) {
       // Open the modal
@@ -310,7 +310,7 @@ const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey, autoOp
           form.setFieldsValue({ key_alias: prefillData.key_alias });
         }
 
-        // Set models - use pending state so they're applied after modelsToPick is populated
+        // Defer model selection until we load the allowed model list.
         if (prefillData.models && prefillData.models.length > 0) {
           setPendingPrefillModels(prefillData.models);
         }
@@ -533,6 +533,8 @@ const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey, autoOp
     }
   }, [selectedCreateKeyTeam, accessToken, userID, userRole]);
 
+  // Apply deferred model prefill once the available model list arrives.
+  // This handles the case where models were provided but no team_id was.
   useEffect(() => {
     if (!pendingPrefillModels || pendingPrefillModels.length === 0) {
       return;
