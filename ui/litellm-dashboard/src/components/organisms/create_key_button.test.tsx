@@ -6,6 +6,7 @@ const { formMock, setFieldsValueMock, radioGroupValueRef } = vi.hoisted(() => {
   const formMock = {
     setFieldsValue: vi.fn(),
     setFieldValue: vi.fn(),
+    getFieldValue: vi.fn(),
     resetFields: vi.fn(),
   };
   const radioGroupValueRef = { current: null as string | null };
@@ -78,15 +79,16 @@ vi.mock("antd", () => {
 
   const Input = (props: any) => React.createElement("input", props);
   Input.Password = (props: any) => React.createElement("input", { ...props, type: "password" });
+  Input.TextArea = (props: any) => React.createElement("textarea", props);
 
   const Modal = ({ children, open }: { children?: any; open?: boolean }) =>
     open ? React.createElement("div", null, children) : null;
 
-  const Radio = {
-    Group: ({ children, value }: { children?: any; value?: string }) => {
-      radioGroupValueRef.current = value ?? null;
-      return React.createElement("div", null, children);
-    },
+  const Radio = ({ children, ...props }: { children?: any }) =>
+    React.createElement("div", props, children);
+  Radio.Group = ({ children, value }: { children?: any; value?: string }) => {
+    radioGroupValueRef.current = value ?? null;
+    return React.createElement("div", null, children);
   };
 
   const Switch = (props: any) => React.createElement("input", { ...props, type: "checkbox" });
@@ -162,7 +164,9 @@ describe("CreateKey", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
+    if (typeof window !== "undefined" && window.localStorage && typeof window.localStorage.clear === "function") {
+      window.localStorage.clear();
+    }
     authorizedState = { ...defaultAuthorizedState };
     radioGroupValueRef.current = null;
   });
