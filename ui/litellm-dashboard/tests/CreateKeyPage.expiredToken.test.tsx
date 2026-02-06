@@ -191,9 +191,11 @@ describe("CreateKeyPage auth behavior", () => {
     // Act
     render(<CreateKeyPage />);
 
-    // Assert: we eventually redirect to SSO login (single replace, not assign/href)
+    // Assert: we eventually redirect to SSO login with return URL (single replace, not assign/href)
     await waitFor(() => {
-      expect(window.location.replace).toHaveBeenCalledWith("https://example.com/ui/login");
+      expect(window.location.replace).toHaveBeenCalledWith(
+        expect.stringContaining("https://example.com/ui/login?redirect_to=")
+      );
     });
 
     // And we attempted to clear the cookie (defensive deletion)

@@ -44,11 +44,24 @@ import { simplifyKeyGenerateError } from "./utils";
 
 const { Option } = Select;
 
+/**
+ * Interface for pre-filling the create key form from URL parameters
+ */
+export interface CreateKeyPrefillData {
+  owned_by?: "you" | "service_account" | "another_user";
+  team_id?: string;
+  key_alias?: string;
+  models?: string[];
+  key_type?: "default" | "llm_api" | "management";
+}
+
 interface CreateKeyProps {
   team: Team | null;
   data: any[] | null;
   teams: Team[] | null;
   addKey: (data: any) => void;
+  autoOpenCreate?: boolean;
+  prefillData?: CreateKeyPrefillData;
 }
 
 interface User {
@@ -139,7 +152,7 @@ export const fetchUserModels = async (
  * Please contribute to the new refactor.
  * ─────────────────────────────────────────────────────────────────────────
  */
-const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey }) => {
+const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey, autoOpenCreate, prefillData }) => {
   const { accessToken, userId: userID, userRole, premiumUser } = useAuthorized();
   const queryClient = useQueryClient();
   const [form] = Form.useForm();
@@ -150,6 +163,8 @@ const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey }) => {
   const [modelsToPick, setModelsToPick] = useState<string[]>([]);
   const [keyOwner, setKeyOwner] = useState("you");
   const [predefinedTags, setPredefinedTags] = useState(getPredefinedTags(data));
+  const [hasPrefilled, setHasPrefilled] = useState(false);
+  const [pendingPrefillModels, setPendingPrefillModels] = useState<string[] | null>(null);
   const [guardrailsList, setGuardrailsList] = useState<string[]>([]);
   const [policiesList, setPoliciesList] = useState<string[]>([]);
   const [promptsList, setPromptsList] = useState<string[]>([]);
@@ -259,6 +274,55 @@ const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey }) => {
 
     fetchPossibleRoles();
   }, [accessToken]);
+
+  // Auto-open modal and prefill form when autoOpenCreate is true
+  // Only allow auto-open for users with write access (same check as the button)
+  useEffect(() => {
+    if (autoOpenCreate && !hasPrefilled && teams && userRole && rolesWithWriteAccess.includes(userRole)) {
+      // Open the modal
+      setIsModalVisible(true);
+      setHasPrefilled(true);
+
+      // Apply prefill data if provided
+      if (prefillData) {
+        // Set key owner (owned_by) - validate that "another_user" is only allowed for Admin
+        if (prefillData.owned_by) {
+          if (prefillData.owned_by === "another_user" && userRole !== "Admin") {
+            // Ignore invalid owned_by for non-admin users, fall back to default
+            setKeyOwner("you");
+          } else {
+            setKeyOwner(prefillData.owned_by);
+          }
+        }
+
+        // Set team - find the team by ID and set it (only if team exists in user's teams)
+        if (prefillData.team_id) {
+          const selectedTeam = teams?.find((t) => t.team_id === prefillData.team_id) || null;
+          if (selectedTeam) {
+            setSelectedCreateKeyTeam(selectedTeam);
+            form.setFieldsValue({ team_id: prefillData.team_id });
+          }
+          // Silently ignore invalid team_id - don't prefill with a team user doesn't have access to
+        }
+
+        // Set key alias
+        if (prefillData.key_alias) {
+          form.setFieldsValue({ key_alias: prefillData.key_alias });
+        }
+
+        // Set models - use pending state so they're applied after modelsToPick is populated
+        if (prefillData.models && prefillData.models.length > 0) {
+          setPendingPrefillModels(prefillData.models);
+        }
+
+        // Set key type
+        if (prefillData.key_type) {
+          setKeyType(prefillData.key_type);
+          form.setFieldsValue({ key_type: prefillData.key_type });
+        }
+      }
+    }
+  }, [autoOpenCreate, prefillData, teams, hasPrefilled, form, userRole]);
 
   // Check if team selection is required
   const isTeamSelectionRequired = modelsToPick.includes("no-default-models");
@@ -452,9 +516,21 @@ const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey }) => {
       fetchTeamModels(userID, userRole, accessToken, selectedCreateKeyTeam?.team_id ?? null).then((models) => {
         let allModels = Array.from(new Set([...(selectedCreateKeyTeam?.models ?? []), ...models]));
         setModelsToPick(allModels);
+
+        // If we have pending prefill models, apply them now that modelsToPick is populated
+        if (pendingPrefillModels && pendingPrefillModels.length > 0) {
+          const validModels = pendingPrefillModels.filter(m => allModels.includes(m));
+          if (validModels.length > 0) {
+            form.setFieldsValue({ models: validModels });
+          }
+          setPendingPrefillModels(null);
+        }
       });
     }
-    form.setFieldValue("models", []);
+    // Only clear models if we don't have pending prefill models
+    if (!pendingPrefillModels) {
+      form.setFieldValue("models", []);
+    }
   }, [selectedCreateKeyTeam, accessToken, userID, userRole]);
 
   // Add a callback function to handle user creation
