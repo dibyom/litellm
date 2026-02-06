@@ -533,6 +533,21 @@ const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey, autoOp
     }
   }, [selectedCreateKeyTeam, accessToken, userID, userRole]);
 
+  useEffect(() => {
+    if (!pendingPrefillModels || pendingPrefillModels.length === 0) {
+      return;
+    }
+    if (!modelsToPick || modelsToPick.length === 0) {
+      return;
+    }
+
+    const validModels = pendingPrefillModels.filter((model) => modelsToPick.includes(model));
+    if (validModels.length > 0) {
+      form.setFieldsValue({ models: validModels });
+    }
+    setPendingPrefillModels(null);
+  }, [pendingPrefillModels, modelsToPick, form]);
+
   // Add a callback function to handle user creation
   const handleUserCreated = (userId: string) => {
     setNewlyCreatedUserId(userId);

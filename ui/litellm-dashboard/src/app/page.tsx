@@ -65,6 +65,34 @@ function deleteCookie(name: string, path = "/") {
   document.cookie = `${name}=; Max-Age=0; Path=${path}`;
 }
 
+function normalizeUrlForCompare(url: string): string {
+  if (typeof window === "undefined") {
+    return url;
+  }
+
+  try {
+    const parsed = new URL(url, window.location.origin);
+    let pathname = parsed.pathname;
+    if (pathname.length > 1 && pathname.endsWith("/")) {
+      pathname = pathname.slice(0, -1);
+    }
+
+    const params = new URLSearchParams(parsed.search);
+    const sortedParams = new URLSearchParams();
+    Array.from(params.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .forEach(([key, value]) => {
+        sortedParams.append(key, value);
+      });
+
+    const search = sortedParams.toString();
+    const hash = parsed.hash || "";
+    return `${parsed.origin}${pathname}${search ? `?${search}` : ""}${hash}`;
+  } catch {
+    return url;
+  }
+}
+
 function formatUserRole(userRole: string) {
   if (!userRole) {
     return "Undefined Role";
@@ -286,13 +314,21 @@ function CreateKeyPageContent() {
     const returnUrl = consumeReturnUrl();
     if (returnUrl) {
       const currentUrl = window.location.href;
+      const normalizedReturnUrl = normalizeUrlForCompare(returnUrl);
+      const normalizedCurrentUrl = normalizeUrlForCompare(currentUrl);
       // Only redirect if the return URL is different from the current URL
       // This prevents infinite redirect loops
-      if (returnUrl !== currentUrl) {
+      if (normalizedReturnUrl !== normalizedCurrentUrl) {
         window.location.replace(returnUrl);
       }
     }
   }, [authLoading, token]);
+
+  useEffect(() => {
+    if (!token) {
+      hasAttemptedReturnRedirectRef.current = false;
+    }
+  }, [token]);
 
   useEffect(() => {
     if (!token) {

@@ -6,7 +6,7 @@ import { isJwtExpired } from "@/utils/jwtUtils";
 import { buildLoginUrlWithReturn, storeReturnUrl } from "@/utils/returnUrlUtils";
 import { jwtDecode } from "jwt-decode";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useUIConfig } from "./uiConfig/useUIConfig";
 
 function formatUserRole(userRole: string) {
@@ -45,13 +45,13 @@ const useAuthorized = () => {
   const token = typeof document !== "undefined" ? getCookie("token") : null;
 
   // Helper function to redirect to login while preserving the current URL
-  const redirectToLogin = () => {
+  const redirectToLogin = useCallback(() => {
     // Store the current URL so we can redirect back after login
     storeReturnUrl();
     const baseLoginUrl = `${getProxyBaseUrl()}/ui/login`;
     const loginUrlWithReturn = buildLoginUrlWithReturn(baseLoginUrl);
     router.replace(loginUrlWithReturn);
-  };
+  }, [router]);
   // Step 1: Check for missing token or expired JWT - kick out immediately (even if UI Config is loading)
   useEffect(() => {
     if (!token || (token && isJwtExpired(token))) {
@@ -60,7 +60,7 @@ const useAuthorized = () => {
       }
       redirectToLogin();
     }
-  }, [token, router]);
+  }, [token, redirectToLogin]);
 
   useEffect(() => {
     if (isUIConfigLoading) {
@@ -69,7 +69,7 @@ const useAuthorized = () => {
     if (uiConfig?.admin_ui_disabled) {
       redirectToLogin();
     }
-  }, [router, isUIConfigLoading, uiConfig]);
+  }, [isUIConfigLoading, uiConfig, redirectToLogin]);
 
   // Decode safely
   const decoded = useMemo(() => {
@@ -82,7 +82,7 @@ const useAuthorized = () => {
       redirectToLogin();
       return null;
     }
-  }, [token, router]);
+  }, [token, redirectToLogin]);
 
   return {
     token: token,
