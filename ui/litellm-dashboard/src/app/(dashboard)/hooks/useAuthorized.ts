@@ -3,6 +3,7 @@
 import { getProxyBaseUrl } from "@/components/networking";
 import { clearTokenCookies, getCookie } from "@/utils/cookieUtils";
 import { isJwtExpired } from "@/utils/jwtUtils";
+import { buildLoginUrlWithReturn, storeReturnUrl } from "@/utils/returnUrlUtils";
 import { jwtDecode } from "jwt-decode";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo } from "react";
@@ -43,13 +44,21 @@ const useAuthorized = () => {
 
   const token = typeof document !== "undefined" ? getCookie("token") : null;
 
+  // Helper function to redirect to login while preserving the current URL
+  const redirectToLogin = () => {
+    // Store the current URL so we can redirect back after login
+    storeReturnUrl();
+    const baseLoginUrl = `${getProxyBaseUrl()}/ui/login`;
+    const loginUrlWithReturn = buildLoginUrlWithReturn(baseLoginUrl);
+    router.replace(loginUrlWithReturn);
+  };
   // Step 1: Check for missing token or expired JWT - kick out immediately (even if UI Config is loading)
   useEffect(() => {
     if (!token || (token && isJwtExpired(token))) {
       if (token) {
         clearTokenCookies();
       }
-      router.replace(`${getProxyBaseUrl()}/ui/login`);
+      redirectToLogin();
     }
   }, [token, router]);
 
@@ -58,7 +67,7 @@ const useAuthorized = () => {
       return;
     }
     if (uiConfig?.admin_ui_disabled) {
-      router.replace(`${getProxyBaseUrl()}/ui/login`);
+      redirectToLogin();
     }
   }, [router, isUIConfigLoading, uiConfig]);
 
@@ -70,7 +79,7 @@ const useAuthorized = () => {
     } catch {
       // Bad token in cookie — clear and bounce
       clearTokenCookies();
-      router.replace(`${getProxyBaseUrl()}/ui/login`);
+      redirectToLogin();
       return null;
     }
   }, [token, router]);

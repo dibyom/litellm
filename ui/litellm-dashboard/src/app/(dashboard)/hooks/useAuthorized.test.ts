@@ -8,12 +8,13 @@ import useAuthorized from "./useAuthorized";
 // Unmock useAuthorized to test the actual implementation
 vi.unmock("@/app/(dashboard)/hooks/useAuthorized");
 
-const { replaceMock, clearTokenCookiesMock, getProxyBaseUrlMock, getUiConfigMock, isJwtExpiredMock } = vi.hoisted(() => ({
+const { replaceMock, clearTokenCookiesMock, getProxyBaseUrlMock, getUiConfigMock, isJwtExpiredMock, buildLoginUrlWithReturnMock } = vi.hoisted(() => ({
   replaceMock: vi.fn(),
   clearTokenCookiesMock: vi.fn(),
   getProxyBaseUrlMock: vi.fn(() => "http://proxy.example"),
   getUiConfigMock: vi.fn(),
   isJwtExpiredMock: vi.fn(),
+  buildLoginUrlWithReturnMock: vi.fn((baseUrl: string) => baseUrl),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -47,6 +48,14 @@ vi.mock("@/utils/jwtUtils", async (importOriginal) => {
   };
 });
 
+vi.mock("@/utils/returnUrlUtils", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/utils/returnUrlUtils")>();
+  return {
+    ...actual,
+    buildLoginUrlWithReturn: buildLoginUrlWithReturnMock,
+    storeReturnUrl: vi.fn(),
+  };
+});
 const createQueryClient = () =>
   new QueryClient({
     defaultOptions: {
@@ -78,6 +87,7 @@ describe("useAuthorized", () => {
     getProxyBaseUrlMock.mockClear();
     getUiConfigMock.mockReset();
     isJwtExpiredMock.mockReset();
+    buildLoginUrlWithReturnMock.mockClear();
     clearCookie();
   });
 
