@@ -511,6 +511,9 @@ const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey, autoOp
     NotificationsManager.success("Virtual Key copied to clipboard");
   };
 
+  // Fetch available models when team or auth changes.
+  // Note: Model prefill from URL params is handled by the useEffect below, which
+  // watches for pendingPrefillModels + modelsToPick to both be populated.
   useEffect(() => {
     if (userID && userRole && accessToken) {
       fetchTeamModels(userID, userRole, accessToken, selectedCreateKeyTeam?.team_id ?? null).then((models) => {
@@ -525,7 +528,7 @@ const CreateKey: React.FC<CreateKeyProps> = ({ team, teams, data, addKey, autoOp
   }, [selectedCreateKeyTeam, accessToken, userID, userRole, form]);
 
   // Apply deferred model prefill once the available model list arrives.
-  // This handles the case where models were provided but no team_id was.
+  // This handles timing where prefill data arrives before or after models are fetched.
   useEffect(() => {
     if (!pendingPrefillModels || pendingPrefillModels.length === 0) {
       return;
